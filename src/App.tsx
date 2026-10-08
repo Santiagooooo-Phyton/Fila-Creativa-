@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import "./App.css";
 
 type Prioridad = "normal" | "urgente";
