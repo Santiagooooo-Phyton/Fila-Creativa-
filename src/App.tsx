@@ -1,39 +1,15 @@
 import { useState, type FormEvent } from "react";
+import { turnosIniciales } from "./data/turnosIniciales";
+import {
+  atenderPrimero,
+  camposTurnoCompletos,
+  crearTurno,
+  devolverALaFila,
+  insertarEnFila,
+  MENSAJE_CAMPOS_REQUERIDOS,
+} from "./logic/fila";
+import type { Prioridad, Turno } from "./types/turno";
 import "./App.css";
-
-type Prioridad = "normal" | "urgente";
-
-interface Turno {
-  id: string;
-  nombre: string;
-  motivo: string;
-  prioridad: Prioridad;
-  hora: string;
-}
-
-const turnosIniciales: Turno[] = [
-  {
-    id: "t-1",
-    nombre: "Lina",
-    motivo: "Pregunta sobre React e Inmutabilidad",
-    prioridad: "urgente",
-    hora: "10:15 AM",
-  },
-  {
-    id: "t-2",
-    nombre: "Tomás",
-    motivo: "Error de instalación de dependencias",
-    prioridad: "normal",
-    hora: "10:18 AM",
-  },
-  {
-    id: "t-3",
-    nombre: "Mariana",
-    motivo: "Duda sobre Hooks y useEffect",
-    prioridad: "normal",
-    hora: "10:22 AM",
-  },
-];
 
 function App() {
   const [turnos, setTurnos] = useState<Turno[]>(turnosIniciales);
@@ -61,41 +37,22 @@ function App() {
     const nombreLimpio = nombre.trim();
     const motivoLimpio = motivo.trim();
 
-    if (!nombreLimpio || !motivoLimpio) {
-      setError("Por favor completa el nombre y el motivo.");
+    if (!camposTurnoCompletos(nombreLimpio, motivoLimpio)) {
+      setError(MENSAJE_CAMPOS_REQUERIDOS);
       return;
     }
 
-    const nuevoTurno: Turno = {
-      id: `t-${Date.now()}`,
+    const nuevoTurno = crearTurno({
       nombre: nombreLimpio,
       motivo: motivoLimpio,
       prioridad,
-      hora: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
+    });
+
+    setTurnos((filaActual) => insertarEnFila(filaActual, nuevoTurno));
 
     if (prioridad === "urgente") {
-      const ultimoUrgente = turnos.findLastIndex(
-        (turno) => turno.prioridad === "urgente"
-      );
-
-      if (ultimoUrgente !== -1) {
-        const nuevaFila = [...turnos];
-
-        nuevaFila.splice(ultimoUrgente + 1, 0, nuevoTurno);
-
-        setTurnos(nuevaFila);
-      } else {
-        setTurnos((filaActual) => [nuevoTurno, ...filaActual]);
-      }
-
       mostrarMensaje(`Turno urgente agregado para ${nombreLimpio}`);
     } else {
-      setTurnos((filaActual) => [...filaActual, nuevoTurno]);
-
       mostrarMensaje(`Turno de ${nombreLimpio} agregado a la fila`);
     }
 
@@ -106,20 +63,20 @@ function App() {
   };
 
   const atenderSiguiente = () => {
-    if (turnos.length === 0) {
+    const { atendido, filaRestante } = atenderPrimero(turnos);
+
+    if (!atendido) {
       return;
     }
 
-    const turnoAtendido = turnos[0];
-
     setHistorial((historialAnterior) => [
-      turnoAtendido,
+      atendido,
       ...historialAnterior,
     ]);
 
-    setTurnos((filaActual) => filaActual.slice(1));
+    setTurnos(filaRestante);
 
-    mostrarMensaje(`Atendiendo a ${turnoAtendido.nombre}`);
+    mostrarMensaje(`Atendiendo a ${atendido.nombre}`);
   };
 
   const restaurarUltimo = () => {
@@ -127,11 +84,16 @@ function App() {
       return;
     }
 
-    const [ultimoAtendido, ...resto] = historial;
+    const ultimoAtendido = historial[0];
 
-    setTurnos((filaActual) => [ultimoAtendido, ...filaActual]);
+    const { fila, historial: historialRestante } = devolverALaFila(
+      turnos,
+      historial
+    );
 
-    setHistorial(resto);
+    setTurnos(fila);
+
+    setHistorial(historialRestante);
 
     mostrarMensaje(
       `Turno de ${ultimoAtendido.nombre} devuelto a la fila`
